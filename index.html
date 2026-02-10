@@ -355,10 +355,13 @@
 			}
 
 			.sticker {
-				position: absolute;
-				left: 50%;
-				top: 18px;
-				transform: translateX(-50%);
+				position: relative;
+				left: auto;
+				top: auto;
+				transform: none;
+				margin-top: 14px;
+				margin-left: auto;
+				margin-right: auto;
 				padding: 10px 12px;
 				border-radius: 999px;
 				border: 1px solid rgba(255, 61, 127, 0.20);
@@ -378,13 +381,13 @@
 
 			@keyframes pop {
 				0% {
-					transform: translateX(-50%) scale(0.85);
+					transform: scale(0.85);
 				}
 				60% {
-					transform: translateX(-50%) scale(1.04);
+					transform: scale(1.04);
 				}
 				100% {
-					transform: translateX(-50%) scale(1);
+					transform: scale(1);
 				}
 			}
 
@@ -547,15 +550,16 @@
 				</p>
 				<p class="prompt">Pick wisely (the buttons are… emotionally invested).</p>
 
+				<div class="sticker" id="sticker" aria-live="polite" aria-atomic="true">
+					<svg class="beat" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M12 21s-7.2-4.44-9.6-8.28C.7 9.9 1.7 6.9 4.2 5.7c1.7-.84 3.8-.48 5.2.78 1.4-1.26 3.5-1.62 5.2-.78 2.5 1.2 3.5 4.2 1.8 7.02C19.2 16.56 12 21 12 21z"
+						/>
+					</svg>
+					<span id="stickerText">Cute alert!</span>
+				</div>
+
 				<div class="playground" id="playground" aria-label="Buttons area">
-					<div class="sticker" id="sticker" aria-hidden="true">
-						<svg class="beat" viewBox="0 0 24 24" aria-hidden="true">
-							<path
-								d="M12 21s-7.2-4.44-9.6-8.28C.7 9.9 1.7 6.9 4.2 5.7c1.7-.84 3.8-.48 5.2.78 1.4-1.26 3.5-1.62 5.2-.78 2.5 1.2 3.5 4.2 1.8 7.02C19.2 16.56 12 21 12 21z"
-							/>
-						</svg>
-						<span id="stickerText">Cute alert!</span>
-					</div>
 					<button class="btn btn-yes" id="yesBtn" type="button">Yes 💘</button>
 					<button class="btn btn-no" id="noBtn" type="button">No 🙃</button>
 				</div>
@@ -669,9 +673,25 @@
 				};
 			}
 
+			function isMobileLayout() {
+				return window.matchMedia && window.matchMedia('(max-width: 520px)').matches;
+			}
+
 			function moveNoButton() {
 				const pad = 10;
 				const pg = playground.getBoundingClientRect();
+
+				// On mobile, the CSS sets buttons full-width; if we move "No" around,
+				// shrink it to an auto-sized pill so it can dodge "Yes".
+				if (isMobileLayout()) {
+					noBtn.style.width = 'max-content';
+					noBtn.style.maxWidth = Math.max(140, pg.width * 0.75) + 'px';
+					noBtn.style.whiteSpace = 'nowrap';
+					noBtn.style.right = 'auto';
+				}
+
+				// Ensure layout updates before measuring
+				void noBtn.offsetWidth;
 				const btnRect = noBtn.getBoundingClientRect();
 
 				const maxX = pg.width - btnRect.width - pad;
@@ -679,11 +699,24 @@
 
 				const yesR = getRectInPlayground(yesBtn);
 				const gap = 12;
+				const yBelowMin = Math.ceil(yesR.y + yesR.h + gap);
+				const yBelowMax = Math.floor(maxY);
+				const yAboveMin = pad;
+				const yAboveMax = Math.floor(yesR.y - btnRect.height - gap);
 
 				let placed = false;
 				for (let tries = 0; tries < 30; tries += 1) {
 					const x = clamp(randomInt(pad, Math.max(pad, Math.floor(maxX))), pad, Math.max(pad, maxX));
-					const y = clamp(randomInt(pad, Math.max(pad, Math.floor(maxY))), pad, Math.max(pad, maxY));
+
+					// Prefer placing "No" below "Yes" when possible (mobile especially)
+					let y;
+					if (yBelowMin <= yBelowMax) {
+						y = clamp(randomInt(yBelowMin, yBelowMax), pad, Math.max(pad, maxY));
+					} else if (yAboveMin <= yAboveMax) {
+						y = clamp(randomInt(yAboveMin, yAboveMax), pad, Math.max(pad, maxY));
+					} else {
+						y = clamp(randomInt(pad, Math.max(pad, Math.floor(maxY))), pad, Math.max(pad, maxY));
+					}
 
 					const candidate = { x, y, w: btnRect.width, h: btnRect.height };
 					if (!rectsOverlap(candidate, yesR, gap)) {
